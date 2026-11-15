@@ -1,0 +1,45 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Сценарии\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+Container(homes, "Дома и доступ", "Go")
+Container(telemetry, "Телеметрия", "Python")
+Container(heating, "Отопление", "Go")
+Container(lighting, "Освещение", "Go")
+Container(gates, "Ворота", "Go")
+ContainerDb(db, "scenarios_db", "PostgreSQL", "Правила, запуски, результаты")
+
+Container_Boundary(service, "Сценарии / Go") {
+  Component(api, "API", "Go / REST", "JWT, правила и расписания")
+  Component(engine, "Проверка условий", "Go / таймер", "Проверяет правила по расписанию")
+  Component(actions, "Выполнение действий", "Go / HTTP", "Вызывает сервисы управления")
+}
+
+Rel(gateway, api, "Настраивает сценарий", "REST / JWT")
+Rel(api, homes, "Проверяет права", "REST")
+Rel(api, db, "Читает и пишет правила", "SQL")
+Rel(engine, telemetry, "Запрашивает последние показания", "REST")
+Rel(engine, db, "Читает правила, сохраняет состояние условий", "SQL")
+Rel(engine, actions, "Запускает действия при выполнении условия")
+Rel(actions, db, "Сохраняет запуск и результат", "SQL")
+Rel(actions, heating, "Задаёт режим", "REST / JWT")
+Rel(actions, lighting, "Задаёт состояние", "REST / JWT")
+Rel(actions, gates, "Задаёт состояние", "REST / JWT")
+
+note bottom of engine
+  Проверяет свежесть измерений.
+  Запускает правило при смене условия на true
+  или при наступлении времени запуска.
+end note
+note bottom of actions
+  Целевой API проверяет права владельца.
+  Результат приходит в HTTP-ответе.
+  Для повтора используется тот же runId/actionId.
+end note
+@enduml

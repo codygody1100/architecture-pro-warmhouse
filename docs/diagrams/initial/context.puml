@@ -1,0 +1,24 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Context>
+
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+
+title Initial Monolith\nC4: контекст системы
+
+Person(owner, "Пользователь")
+Person(installer, "Специалист")
+
+System(warmhouse, "Тёплый дом", "Монолит")
+
+System_Ext(heating, "Модули отопления", "Датчики и реле в домах")
+
+Rel_D(owner, warmhouse, "Управляет отоплением\nи смотрит температуру", "Веб-интерфейс")
+Rel_D(installer, warmhouse, "Подключает устройства")
+Rel_D(warmhouse, heating, "Отправляет команды,\nзапрашивает температуру", "Синхронно")
+
+SHOW_LEGEND()
+@enduml

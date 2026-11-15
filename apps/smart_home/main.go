@@ -17,15 +17,26 @@ import (
 )
 
 func main() {
-	// Set up database connection
-	dbURL := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/smarthome")
-	database, err := db.New(dbURL)
-	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+	// Switch the registry to HTTP while keeping the legacy mode available.
+	var store handlers.SensorStore
+	if deviceAPIURL := os.Getenv("DEVICE_API_URL"); deviceAPIURL != "" {
+		store = services.NewDeviceService(deviceAPIURL)
+		log.Printf("Using device API: %s", deviceAPIURL)
+	} else {
+		dbURL := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/smarthome")
+		database, err := db.New(dbURL)
+		if err != nil {
+			log.Fatalf("Unable to connect to database: %v", err)
+		}
+		defer database.Close()
+		store = database
+		log.Println("Using legacy database access")
 	}
-	defer database.Close()
 
-	log.Println("Connected to database successfully")
+	var telemetryService *services.TelemetryService
+	if telemetryAPIURL := os.Getenv("TELEMETRY_API_URL"); telemetryAPIURL != "" {
+		telemetryService = services.NewTelemetryService(telemetryAPIURL)
+	}
 
 	// Initialize temperature service
 	temperatureAPIURL := getEnv("TEMPERATURE_API_URL", "http://temperature-api:8081")
@@ -46,7 +57,7 @@ func main() {
 	apiRoutes := router.Group("/api/v1")
 
 	// Register sensor routes
-	sensorHandler := handlers.NewSensorHandler(database, temperatureService)
+	sensorHandler := handlers.NewSensorHandler(store, temperatureService, telemetryService)
 	sensorHandler.RegisterRoutes(apiRoutes)
 
 	// Start server

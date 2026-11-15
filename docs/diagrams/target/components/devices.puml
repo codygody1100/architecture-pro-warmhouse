@@ -1,0 +1,55 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Устройства\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+Container(heating, "Отопление", "Go")
+Container(lighting, "Освещение", "Go")
+Container(gates, "Ворота", "Go")
+Container(telemetry, "Телеметрия", "Python")
+Container(video, "Видеонаблюдение", "Go")
+Container(homes, "Дома и доступ", "Go")
+System_Ext(equipment, "Устройства / домашний шлюз", "HTTP API")
+ContainerDb(db, "devices_db", "PostgreSQL", "Реестр и результаты команд")
+
+Container_Boundary(service, "Устройства / Java") {
+  Component(api, "API", "Java / REST", "JWT, реестр, команды, показания")
+  Component(registry, "Реестр устройств", "Java", "Привязка к дому и возможности")
+  Component(dispatcher, "Доставка команд", "Java", "Проверяет команду, ждёт результат")
+  Component(readings, "Чтение показаний", "Java", "Получает измерения датчиков")
+  Component(adapters, "Адаптеры", "Java / HTTP", "Команды и запросы к оборудованию")
+  Component(repository, "Хранилище", "Java / SQL", "Реестр и история команд")
+}
+
+Rel(gateway, api, "Реестр и подключение", "REST / JWT")
+Rel(heating, api, "Информация и команды", "REST")
+Rel(lighting, api, "Информация и команды", "REST")
+Rel(gates, api, "Информация и команды", "REST")
+Rel(telemetry, api, "Показания датчиков", "REST")
+Rel(video, api, "Камера и её дом", "REST")
+Rel(api, homes, "Проверяет права", "REST")
+Rel(api, registry, "Выполняет запрос к реестру")
+Rel(api, dispatcher, "Передаёт команду")
+Rel(api, readings, "Запрашивает показания")
+Rel(registry, repository, "Читает и меняет реестр")
+Rel(dispatcher, repository, "Проверяет устройство, сохраняет результат")
+Rel(dispatcher, adapters, "Выполняет команду")
+Rel(readings, repository, "Получает список датчиков")
+Rel(readings, adapters, "Запрашивает измерения")
+Rel(adapters, equipment, "Команда или запрос показаний", "HTTPS")
+Rel(repository, db, "Читает и пишет", "SQL")
+
+note bottom of api
+  Результат возвращается в HTTP-ответе.
+end note
+note bottom of registry
+  Привязка к дому по одноразовому коду.
+  Доступ к HTTP API устройства по его ключу.
+  Новые модели поддерживаются адаптерами.
+end note
+@enduml

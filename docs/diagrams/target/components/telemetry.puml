@@ -1,0 +1,35 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Телеметрия\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+Container(scenarios, "Сценарии", "Go")
+Container(homes, "Дома и доступ", "Go")
+Container(devices, "Устройства", "Java")
+ContainerDb(db, "telemetry_db", "PostgreSQL", "Измерения и история")
+
+Container_Boundary(service, "Телеметрия / Python") {
+  Component(api, "API", "Python / REST", "JWT, последние показания и история")
+  Component(collector, "Сбор показаний", "Python / таймер", "Периодически опрашивает устройства")
+  Component(repository, "Хранилище", "Python / SQL", "Измерения по дому и устройству")
+}
+
+Rel(gateway, api, "Показания и история", "REST / JWT")
+Rel(scenarios, api, "Последние показания", "REST")
+Rel(api, homes, "Проверяет права на дом", "REST")
+Rel(api, repository, "Читает по houseId и deviceId")
+Rel(collector, devices, "Запрашивает свежие показания", "REST")
+Rel(collector, repository, "Сохраняет измерения")
+Rel(repository, db, "Читает и пишет", "SQL")
+
+note bottom of collector
+  При ошибке данные не обновляются.
+  Прошлое значение сохраняется со своим временем.
+  Новый опрос выполняется по таймеру.
+end note
+@enduml

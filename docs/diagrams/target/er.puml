@@ -1,0 +1,128 @@
+@startuml
+!pragma layout smetana
+top to bottom direction
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #64748B
+skinparam packageBorderColor #94A3B8
+skinparam ArrowColor #64748B
+hide circle
+hide methods
+
+title Логическая модель данных «Тёплого дома»
+
+package "Дома и доступ / homes_db" #EFF6FF {
+  entity "Пользователь\nUser" as User {
+    * id : UUID <<PK>>
+    --
+    * auth_subject : VARCHAR <<UQ>>
+    * name : VARCHAR
+    email : VARCHAR
+  }
+
+  entity "Дом\nHouse" as House {
+    * id : UUID <<PK>>
+    --
+    * owner_user_id : UUID <<FK>>
+    * name : VARCHAR
+    address : VARCHAR
+  }
+
+  entity "Доступ к дому\nHouseMember" as HouseMember {
+    * house_id : UUID <<PK, FK>>
+    * user_id : UUID <<PK, FK>>
+    --
+    * role : VARCHAR
+  }
+}
+
+package "Устройства / devices_db" #F0FDF4 {
+  entity "Модуль дома\nModule" as Module {
+    * id : UUID <<PK>>
+    --
+    * house_id : UUID <<ref>>
+    * name : VARCHAR
+    * kind : VARCHAR
+  }
+
+  entity "Тип устройства\nDeviceType" as DeviceType {
+    * id : UUID <<PK>>
+    --
+    * name : VARCHAR
+    * protocol : VARCHAR
+    * capabilities : JSONB
+  }
+
+  entity "Устройство\nDevice" as Device {
+    * id : UUID <<PK>>
+    --
+    * module_id : UUID <<FK>>
+    * type_id : UUID <<FK>>
+    * serial_number : VARCHAR <<UQ>>
+    * name : VARCHAR
+    * status : VARCHAR
+  }
+}
+
+package "Телеметрия / telemetry_db" #FFFBEB {
+  entity "Измерение\nTelemetryData" as TelemetryData {
+    * id : BIGINT <<PK>>
+    --
+    * device_id : UUID <<ref>>
+    * house_id : UUID <<ref>>
+    * metric : VARCHAR
+    * value : NUMERIC
+    * unit : VARCHAR
+    * measured_at : TIMESTAMPTZ
+  }
+}
+
+package "Сценарии / scenarios_db" #FAF5FF {
+  entity "Сценарий\nScenario" as Scenario {
+    * id : UUID <<PK>>
+    --
+    * house_id : UUID <<ref>>
+    * owner_user_id : UUID <<ref>>
+    * name : VARCHAR
+    * enabled : BOOLEAN
+    * trigger_type : VARCHAR
+    schedule : VARCHAR
+  }
+
+  entity "Условие\nScenarioCondition" as ScenarioCondition {
+    * id : UUID <<PK>>
+    --
+    * scenario_id : UUID <<FK>>
+    * device_id : UUID <<ref>>
+    * metric : VARCHAR
+    * operator : VARCHAR
+    * threshold : NUMERIC
+  }
+
+  entity "Действие\nScenarioAction" as ScenarioAction {
+    * id : UUID <<PK>>
+    --
+    * scenario_id : UUID <<FK>>
+    * device_id : UUID <<ref>>
+    * command : VARCHAR
+    * parameters : JSONB
+  }
+}
+
+User ||--o{ House : владелец
+User ||--o{ HouseMember : участник
+House ||--o{ HouseMember : доступ
+House ||..o{ Module : модули
+Module ||--o{ Device : устройства
+DeviceType ||--o{ Device : тип
+Device ||..o{ TelemetryData : измерения
+House ||..o{ TelemetryData : дом
+House ||..o{ Scenario : сценарии
+User ||..o{ Scenario : автор
+Scenario ||--o{ ScenarioCondition : условия
+Scenario ||--|{ ScenarioAction : действия
+Device ||..o{ ScenarioCondition : датчик
+Device ||..o{ ScenarioAction : исполнитель
+@enduml
