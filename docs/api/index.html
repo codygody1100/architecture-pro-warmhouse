@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Тёплый дом: документация API</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
+</head>
+<body>
+  <noscript>Для просмотра Swagger UI включите JavaScript. <a href="openapi.yaml">Скачать OpenAPI</a></noscript>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" crossorigin></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: "./openapi.yaml",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        defaultModelsExpandDepth: 0,
+        supportedSubmitMethods: [],
+        validatorUrl: null
+      });
+    };
+  </script>
+</body>
+</html>

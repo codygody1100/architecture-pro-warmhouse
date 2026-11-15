@@ -1,9 +1,4 @@
--- Create the database if it doesn't exist
-CREATE DATABASE smarthome;
-
--- Connect to the database
-\c smarthome;
-
+-- The database is created by POSTGRES_DB in docker-compose.yml.
 -- Create the sensors table
 CREATE TABLE IF NOT EXISTS sensors (
     id SERIAL PRIMARY KEY,

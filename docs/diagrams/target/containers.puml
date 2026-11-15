@@ -1,0 +1,69 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Container>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+
+title Целевая архитектура «Тёплого дома»\nC4 Containers
+
+Person(user, "Пользователь")
+System_Ext(identity, "Сервис входа", "OIDC, учётные записи")
+System_Ext(camera, "Камера / домашний шлюз", "Публикует видео из дома")
+
+System_Boundary(warmhouse, "Тёплый дом") {
+  Container(web, "Веб-приложение", "TypeScript", "Управление домом, показания и видео")
+  Container(gateway, "API Gateway", "Nginx", "Маршрутизация и лимиты запросов")
+  Container(homes, "Дома и доступ", "Go", "Дома, пользователи, права")
+  Container(devices, "Устройства", "Java", "Подключение, команды и показания")
+  Container(heating, "Отопление", "Go", "Команды отоплению")
+  Container(lighting, "Освещение", "Go", "Команды свету")
+  Container(gates, "Ворота", "Go", "Запирание и отпирание")
+  Container(telemetry, "Телеметрия", "Python", "Измерения и история")
+  Container(scenarios, "Сценарии", "Go", "Правила автоматизации")
+  Container(video, "Видеонаблюдение", "Go", "Доступ к камерам и сеансы")
+  Container(media, "Медиасервер", "WebRTC / TURN", "Передаёт видео, обходит NAT")
+  ContainerDb(homesDb, "homes_db", "PostgreSQL", "Дома и права")
+  ContainerDb(devicesDb, "devices_db", "PostgreSQL", "Реестр и результаты команд")
+  ContainerDb(heatingDb, "heating_db", "PostgreSQL", "Команды и результаты")
+  ContainerDb(lightingDb, "lighting_db", "PostgreSQL", "Команды и результаты")
+  ContainerDb(gatesDb, "gates_db", "PostgreSQL", "Команды и результаты")
+  ContainerDb(telemetryDb, "telemetry_db", "PostgreSQL", "Измерения и история")
+  ContainerDb(scenariosDb, "scenarios_db", "PostgreSQL", "Правила, запуски, результаты")
+  ContainerDb(videoDb, "video_db", "PostgreSQL", "Сеансы просмотра")
+}
+
+Rel(user, web, "Пользуется", "HTTPS")
+Rel(web, identity, "Входит", "OIDC + PKCE")
+Rel(web, gateway, "Вызывает API", "HTTPS / JWT")
+Rel(gateway, homes, "Дома и права", "REST")
+Rel(gateway, devices, "Подключение и реестр", "REST")
+Rel(gateway, heating, "Команды", "REST")
+Rel(gateway, lighting, "Команды", "REST")
+Rel(gateway, gates, "Команды", "REST")
+Rel(gateway, telemetry, "Читает показания", "REST")
+Rel(gateway, scenarios, "Настраивает правила", "REST")
+Rel(gateway, video, "Открывает сеанс", "REST")
+
+Rel(heating, devices, "Передаёт команду", "REST")
+Rel(lighting, devices, "Передаёт команду", "REST")
+Rel(gates, devices, "Передаёт команду", "REST")
+Rel(telemetry, devices, "Опрашивает датчики по таймеру", "REST")
+Rel(scenarios, telemetry, "Читает показания по таймеру", "REST")
+Rel(scenarios, heating, "Запускает действие", "REST / JWT")
+Rel(scenarios, lighting, "Запускает действие", "REST / JWT")
+Rel(scenarios, gates, "Запускает действие", "REST / JWT")
+
+Rel(homes, homesDb, "Читает и пишет", "SQL")
+Rel(devices, devicesDb, "Читает и пишет", "SQL")
+Rel(heating, heatingDb, "Читает и пишет", "SQL")
+Rel(lighting, lightingDb, "Читает и пишет", "SQL")
+Rel(gates, gatesDb, "Читает и пишет", "SQL")
+Rel(telemetry, telemetryDb, "Читает и пишет", "SQL")
+Rel(scenarios, scenariosDb, "Читает и пишет", "SQL")
+Rel(video, videoDb, "Читает и пишет", "SQL")
+
+Rel(video, media, "Создаёт сеанс и доступ", "HTTPS")
+Rel(camera, media, "Публикует поток", "WebRTC / TLS signaling")
+Rel(media, web, "Передаёт поток", "WebRTC")
+@enduml

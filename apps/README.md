@@ -1,60 +1,102 @@
-# Smart Home Sensor Management API
+# Приложения «Тёплого дома»
 
-## Prerequisites
+Учебный MVP: монолит на Go, сервис устройств на Java и сервис телеметрии на Python. Сервисы общаются по HTTP.
 
-- Docker and Docker Compose
+## Запуск
 
-## Getting Started
+Нужны Docker и Docker Compose. Из папки `apps`:
 
-### Option 1: Using Docker Compose (Recommended)
-
-The easiest way to start the application is to use Docker Compose:
-
-```bash
-./init.sh
+```sh
+docker compose up --build -d --wait
 ```
 
-This script will:
+| Сервис | Адрес | Назначение |
+| --- | --- | --- |
+| smart_home | http://localhost:8080 | Прежний API датчиков и вызовы микросервисов. |
+| temperature-api | http://localhost:8081 | Генератор температуры от 15 до 30 °C. |
+| device-api | http://localhost:8083 | Реестр датчиков: создание, чтение, изменение, удаление. |
+| telemetry-api | http://localhost:8084 | Сохранение показаний и история. |
+| postgres | postgres:5432 внутри Compose | Существующая база `smarthome`, таблица `sensors`. |
 
-1. Build and start the PostgreSQL and application containers
-2. Wait for the services to be ready
-3. Display information about how to access the API
+Монолит ждёт готовности зависимостей. PostgreSQL выполняет `smart_home/init.sql` при первом запуске с новым томом. Датчики хранятся в томе `postgres_data`, история в `telemetry_data`. В Linux и macOS запуск также доступен через `./init.sh`.
 
-Alternatively, you can run Docker Compose directly:
+## Как работает MVP
 
-```bash
-docker-compose up -d
+1. Монолит принимает прежние запросы `/api/v1/sensors` и обращается к device-api за данными датчиков.
+2. При создании или чтении температурного датчика монолит запрашивает свежее значение у temperature-api.
+3. Монолит отправляет полученное показание в telemetry-api. Сервис сохраняет его в своей SQLite.
+4. По запросу `/api/v1/sensors/{id}/telemetry` монолит возвращает сохранённую историю.
+
+Java-сервис использует существующую таблицу `sensors`, поэтому ранее созданные датчики и их ID сохраняются. В этом режиме монолит не подключается к БД напрямую. Для возврата к прежнему режиму уберите `DEVICE_API_URL` из окружения `app` в Compose и выполните `docker compose up -d --no-deps --force-recreate app`. `TELEMETRY_API_URL` включает отправку показаний и чтение истории.
+
+## Проверка через Postman
+
+1. Импортируйте [коллекцию](smarthome-api.postman_collection.json).
+2. Выполните `Create Sensor` и запомните `id` из ответа.
+3. Несколько раз выполните `Get All Sensors`. Значения `value` и `last_updated` будут меняться.
+4. В `Get Sensor Telemetry` подставьте полученный ID вместо `1`. В ответе будут сохранённые измерения, новые идут первыми.
+
+История из браузера: [пример для датчика 1](http://localhost:8080/api/v1/sensors/1/telemetry?limit=10).
+
+## API микросервисов
+
+| Сервис | Запрос | Результат |
+| --- | --- | --- |
+| device-api | `POST /devices` | Создать датчик, `201`. |
+| device-api | `GET /devices` | Список датчиков, `200`. |
+| device-api | `GET /devices/{id}` | Данные датчика, `200`. |
+| device-api | `PUT /devices/{id}` | Обновить переданные поля, `200`. |
+| device-api | `PATCH /devices/{id}/value` | Изменить значение и статус, `200`. |
+| device-api | `DELETE /devices/{id}` | Удалить датчик, `200`. |
+| telemetry-api | `POST /readings` | Сохранить измерение, `201`. |
+| telemetry-api | `GET /readings?device_id=1&limit=10` | История устройства, `200`. |
+
+Оба сервиса предоставляют `GET /health`. Некорректные данные возвращают `400`, отсутствующее устройство `404`, недоступное хранилище `503`. Для истории `limit` задаётся от 1 до 1000, по умолчанию 100; без измерений возвращается `[]`.
+
+Пример тела `POST /devices`:
+
+```json
+{"name": "Kitchen Temperature", "type": "temperature", "location": "Kitchen", "unit": "°C"}
 ```
 
-The API will be available at http://localhost:8080
+Формат ответа совпадает с датчиком из исходной Postman-коллекции. Device-api возвращает сохранённые данные, а монолит добавляет свежую температуру при чтении.
 
-### Option 2: Manual setup
+Пример тела `POST /readings`:
 
-If you prefer to run the application without Docker:
-
-1. Start the PostgreSQL database:
-
-```bash
-docker-compose up -d postgres
+```json
+{"device_id": 1, "metric": "temperature", "value": 22.5, "unit": "°C", "recorded_at": "2026-11-14T12:00:00Z"}
 ```
 
-2. Build and run the application:
+В ответе возвращается эта запись с добавленным `id`. История содержит массив таких записей.
 
-```bash
-go build -o smarthome
-./smarthome
+Генератор поддерживает [запрос по комнате](http://localhost:8081/temperature?location=Living%20Room), [по ID](http://localhost:8081/temperature/1) и `/health`. Пример соответствий: `1` = Living Room, `2` = Bedroom, `3` = Kitchen. Другой ID возвращает комнату `Unknown`; показания монолит связывает с фактическим ID датчика. Соседние значения одного датчика не повторяются.
+
+## Границы MVP
+
+Это промежуточная реализация архитектуры из заданий 2-4. Здесь используются числовые ID и модель датчика из шаблона. Авторизация, команды устройствам и опрос по таймеру пока не реализованы. Реестр остаётся в исходной PostgreSQL, для истории используется SQLite вместо целевой PostgreSQL.
+
+История пополняется только при успешном получении температуры во время `Create Sensor`, `Get All Sensors` и `Get Sensor by ID`. Запрос по комнате и ручное изменение значения историю не пополняют. Удаление датчика сохраняет его историю в telemetry-api; через монолит удалённый датчик уже недоступен.
+
+Если temperature-api недоступен, монолит возвращает сохранённые в реестре значения без добавления измерения. Если telemetry-api недоступен, запрос датчика продолжит работать, ошибка сохранения попадёт в лог. Пропущенные измерения не восстанавливаются; чтение истории вернёт `503`. При отказе device-api монолит вернёт `503`, автоматического переключения на прямой доступ к БД нет.
+
+## Остановка и тесты
+
+```sh
+docker compose logs -f
+docker compose down
 ```
 
-## API Testing
+Команда `down` сохраняет данные в обоих томах.
 
-A Postman collection is provided for testing the API. Import the `smarthome-api.postman_collection.json` file into Postman to get started.
+Тесты Go из корня репозитория:
 
-## API Endpoints
+```sh
+go -C apps/temperature-api test ./...
+go -C apps/smart_home test ./...
+```
 
-- `GET /health` - Health check
-- `GET /api/v1/sensors` - Get all sensors
-- `GET /api/v1/sensors/:id` - Get a specific sensor
-- `POST /api/v1/sensors` - Create a new sensor
-- `PUT /api/v1/sensors/:id` - Update a sensor
-- `DELETE /api/v1/sensors/:id` - Delete a sensor
-- `PATCH /api/v1/sensors/:id/value` - Update a sensor's value and status
+Тесты Python из `apps/telemetry-api`, с установленными зависимостями `requirements.txt`:
+
+```sh
+python -m unittest -v
+```

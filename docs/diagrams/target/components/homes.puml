@@ -1,0 +1,31 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Дома и доступ\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+ContainerDb(db, "homes_db", "PostgreSQL", "Дома, участники, роли")
+Container_Boundary(service, "Дома и доступ / Go") {
+  Component(api, "API", "Go / REST", "Проверяет JWT")
+  Component(homes, "Дома и участники", "Go", "Создаёт дома, меняет участников")
+  Component(policy, "Проверка прав", "Go", "Разрешает действие в доме")
+  Component(repository, "Хранилище", "Go / SQL", "Дома и роли участников")
+}
+Rel(gateway, api, "Дома и участники", "REST / JWT")
+Rel(api, homes, "Выполняет запрос")
+Rel(api, policy, "Проверяет действие")
+Rel(homes, policy, "Проверяет право на изменение")
+Rel(homes, repository, "Читает и изменяет")
+Rel(policy, repository, "Получает роли")
+Rel(repository, db, "Читает и пишет", "SQL")
+note bottom of api
+  Прикладные сервисы вызывают проверку:
+  actorId + houseId + action.
+  actorId берётся из проверенного токена.
+  При отказе или недоступности доступ закрыт.
+end note
+@enduml

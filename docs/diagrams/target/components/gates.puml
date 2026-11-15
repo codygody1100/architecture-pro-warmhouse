@@ -1,0 +1,36 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Ворота\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+Container(scenarios, "Сценарии", "Go")
+Container(homes, "Дома и доступ", "Go")
+Container(devices, "Устройства", "Java")
+ContainerDb(db, "gates_db", "PostgreSQL", "Команды и результаты")
+
+Container_Boundary(service, "Ворота / Go") {
+  Component(api, "API", "Go / REST", "JWT и ключ идемпотентности")
+  Component(commands, "Обработка команд", "Go", "Запирание и отпирание")
+  Component(client, "Клиент устройств", "Go / HTTP", "Отправляет запрос и ждёт ответ")
+}
+
+Rel(gateway, api, "Команда или её статус", "REST / JWT")
+Rel(scenarios, api, "Действие владельца сценария", "REST / JWT")
+Rel(api, homes, "Проверяет права на дом", "REST")
+Rel(api, commands, "Выполняет запрос")
+Rel(commands, client, "Проверяет устройство и отправляет команду")
+Rel(client, devices, "Информация и команды", "REST")
+Rel(commands, db, "Читает и сохраняет команду и результат", "SQL")
+
+note bottom of commands
+  Результат приходит в HTTP-ответе.
+  При тайм-ауте статус unknown:
+  устройство могло выполнить команду.
+  Повтор использует тот же commandId.
+end note
+@enduml

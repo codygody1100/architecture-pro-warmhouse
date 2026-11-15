@@ -1,0 +1,40 @@
+@startuml
+!pragma layout smetana
+!include <C4/C4_Component>
+LAYOUT_TOP_DOWN()
+skinparam defaultFontName Arial
+skinparam shadowing false
+hide stereotype
+title Видеонаблюдение\nC4 Components
+
+Container(gateway, "API Gateway", "Nginx")
+Container(homes, "Дома и доступ", "Go")
+Container(devices, "Устройства", "Java")
+Container(media, "Медиасервер", "WebRTC / TURN")
+ContainerDb(db, "video_db", "PostgreSQL", "Сеансы, сроки действия")
+
+Container_Boundary(service, "Видеонаблюдение / Go") {
+  Component(api, "API", "Go / REST", "JWT, создание и закрытие сеансов")
+  Component(sessions, "Менеджер сеансов", "Go", "Камера, дом, доступ, срок")
+  Component(mediaClient, "Клиент медиасервера", "Go / HTTPS", "Создаёт и отзывает доступ")
+}
+
+Rel(gateway, api, "Запрашивает сеанс", "REST / JWT")
+Rel(api, homes, "Проверяет право просмотра", "REST")
+Rel(api, sessions, "Создаёт или закрывает сеанс")
+Rel(sessions, devices, "Проверяет камеру и дом", "REST")
+Rel(sessions, db, "Читает и пишет сеансы", "SQL")
+Rel(sessions, mediaClient, "Управляет доступом")
+Rel(mediaClient, media, "Сеанс и токен с TTL", "HTTPS")
+
+note bottom of sessions
+  Токен ограничен камерой и сроком.
+  При продлении права проверяются снова.
+  Незавершённое создание повторяется по sessionId.
+  Просроченные сеансы закрываются.
+end note
+note bottom of mediaClient
+  Видеопоток идёт через медиасервер.
+  Этот сервис передаёт только управление.
+end note
+@enduml
